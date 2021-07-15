@@ -129,7 +129,15 @@ jobs:
 
 
   wasm_wallet_test:
-    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        target: [ x86_64-unknown-linux-gnu, x86_64-apple-darwin ]
+        include:
+          - target: x86_64-unknown-linux-gnu
+            os: ubuntu-latest
+          - target: x86_64-apple-darwin
+            os: macos-latest
+    runs-on: ${{ matrix.os }}
     steps:
       - name: Checkout sources
         uses: actions/checkout@v2
@@ -149,10 +157,16 @@ jobs:
             target
             ~/.cargo/bin
             ~/.cache/.wasm-pack
-          key: ubuntu-rust-${{ steps.toolchain.outputs.rustc_hash }}-wasm-wallet-cargo-and-target-directory-${{ hashFiles('Cargo.lock') }}-v1
+          key: ${{ matrix.os }}-rust-${{ steps.toolchain.outputs.rustc_hash }}-wasm-wallet-cargo-and-target-directory-${{ hashFiles('Cargo.lock') }}-v1
 
       - name: Install wasm-pack
         run: which wasm-pack || curl https://rustwasm.github.io/wasm-pack/installer/init.sh -sSf | sh
+
+      - name: Set CC and AR vars for MacOs
+        if: contains(matrix.os, 'macos')
+        run: |
+          echo "CC=/usr/local/opt/llvm/bin/clang" >> $GITHUB_ENV
+          echo "AR=/usr/local/opt/llvm/bin/llvm-ar" >> $GITHUB_ENV
 
       - name: Extension wallet tests
         run: |
@@ -163,5 +177,5 @@ jobs:
         if: ${{ failure() }}
         uses: actions/upload-artifact@v2
         with:
-          name: wasm-wallet-test-binary
+          name: ${{ matrix.os }}-wasm-wallet-test-binary
           path: ./target/wasm32-unknown-unknown/debug/deps/wallet-*.wasm
